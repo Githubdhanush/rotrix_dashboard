@@ -12,7 +12,7 @@ from sklearn.metrics import mean_squared_error
 from io import StringIO
 from PIL import Image
 import base64
-import open3d as o3d
+# import open3d as o3d
 import tempfile
 import os
 from pyulog import ULog
@@ -42,15 +42,15 @@ def load_csv(file):
     file.seek(0)
     return pd.read_csv(StringIO(file.read().decode("utf-8")))
 
-def load_pcd(file):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pcd") as tmp:
-        tmp.write(file.read())
-        pcd = o3d.io.read_point_cloud(tmp.name, format='xyz')
-        points = np.asarray(pcd.points)
-        df = pd.DataFrame(points, columns=["X", "Y", "Z"])
-        if len(np.asarray(pcd.colors)) > 0:
-            df["Temperature"] = np.mean(np.asarray(pcd.colors), axis=1)
-    return df
+# def load_pcd(file):
+#     with tempfile.NamedTemporaryFile(delete=False, suffix=".pcd") as tmp:
+#         tmp.write(file.read())
+#         pcd = o3d.io.read_point_cloud(tmp.name, format='xyz')
+#         points = np.asarray(pcd.points)
+#         df = pd.DataFrame(points, columns=["X", "Y", "Z"])
+#         if len(np.asarray(pcd.colors)) > 0:
+#             df["Temperature"] = np.mean(np.asarray(pcd.colors), axis=1)
+#     return df
 
 def load_ulog(file, key_suffix=""):
     ulog = ULog(file)
