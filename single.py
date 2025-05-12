@@ -10,11 +10,17 @@ from sklearn.metrics import mean_squared_error
 from io import StringIO
 from PIL import Image
 import base64
-import open3d as o3d
 import tempfile
 import os
 from pyulog import ULog
 
+# Try to import open3d, but don't fail if it's not available
+try:
+    import open3d as o3d
+    OPEN3D_AVAILABLE = True
+except ImportError:
+    OPEN3D_AVAILABLE = False
+    st.warning("PCD file support is not available on this deployment. PCD files will not be processed.")
 
 st.set_page_config(page_title="ROTRIX Dashboard", layout="wide")
 
@@ -41,14 +47,22 @@ def load_csv(file):
     return pd.read_csv(StringIO(file.read().decode("utf-8")))
 
 def load_pcd(file):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pcd") as tmp:
-        tmp.write(file.read())
-        pcd = o3d.io.read_point_cloud(tmp.name, format='xyz')
-        points = np.asarray(pcd.points)
-        df = pd.DataFrame(points, columns=["X", "Y", "Z"])
-        if len(np.asarray(pcd.colors)) > 0:
-            df["Temperature"] = np.mean(np.asarray(pcd.colors), axis=1)
-    return df
+    if not OPEN3D_AVAILABLE:
+        st.error("PCD file support is not available on this deployment. Please use CSV or ULOG files instead.")
+        return pd.DataFrame()
+    
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pcd") as tmp:
+            tmp.write(file.read())
+            pcd = o3d.io.read_point_cloud(tmp.name, format='xyz')
+            points = np.asarray(pcd.points)
+            df = pd.DataFrame(points, columns=["X", "Y", "Z"])
+            if len(np.asarray(pcd.colors)) > 0:
+                df["Temperature"] = np.mean(np.asarray(pcd.colors), axis=1)
+        return df
+    except Exception as e:
+        st.error(f"Error loading PCD file: {str(e)}")
+        return pd.DataFrame()
 
 def load_ulog(file, key_suffix=""):
     ulog = ULog(file)
@@ -185,8 +199,12 @@ st.markdown("<h4 style='font-size:20px; color:#FFFF00;'>🔼 Upload Benchmark & 
 top_col1, top_col2, top_col3, top_col4 = st.columns(4)
 
 with top_col1:
-
-    benchmark_files = st.file_uploader("📂 Upload Benchmark File", type=["csv", "pcd", "ulg"], accept_multiple_files=True)
+    # Only show PCD in file types if open3d is available
+    file_types = ["csv", "ulg"]
+    if OPEN3D_AVAILABLE:
+        file_types.append("pcd")
+    
+    benchmark_files = st.file_uploader("📂 Upload Benchmark File", type=file_types, accept_multiple_files=True)
     benchmark_names =  [f.name for f in benchmark_files]
     
 with top_col3:
@@ -199,7 +217,7 @@ with top_col3:
             st.session_state.b_df = load_data(b_file, b_file_ext, key_suffix="bench")
         
 with top_col2:
-    validation_files = st.file_uploader("📂 Upload Target File", type=["csv", "pcd", "ulg"], accept_multiple_files=True)
+    validation_files = st.file_uploader("📂 Upload Target File", type=file_types, accept_multiple_files=True)
     validation_names =  [f.name for f in validation_files]
     
 with top_col4:
